@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "lock_server.h"
 
 #include "jsl_log.h"
@@ -34,6 +35,11 @@ main(int argc, char *argv[])
   lock_server ls;
   rpcs server(atoi(argv[1]), count);
   server.reg(lock_protocol::stat, &ls, &lock_server::stat);
+  /* lab #1 */
+  /* server handles client's acquire/release by grant/release */
+  server.reg(lock_protocol::acquire, &ls, &lock_server::grant);
+  server.reg(lock_protocol::release, &ls, &lock_server::release);
+  /* lab #1 */
 #endif
 
 
