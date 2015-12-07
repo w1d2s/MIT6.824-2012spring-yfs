@@ -192,12 +192,12 @@ std::map<unsigned int, std::list<reply_t> > reply_window_;
       /* lab #1 */
       std::list<reply_t>::iterator it;
       for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end(); it++){
-  	  if(it->xid == xid){
-  	      it->buf = b;
-  	      it->sz = sz;
-  	      it->cb_present = true;
-  	      break;
-  	  }
+          if(it->xid == xid){
+              it->buf = b;
+              it->sz = sz;
+              it->cb_present = true;
+              break;
+          }
       }
       // You fill this in for Lab 1.
   }
