@@ -69,6 +69,7 @@
 #include <netinet/tcp.h>
 #include <time.h>
 #include <netdb.h>
+#include <unistd.h>
 
 #include "jsl_log.h"
 #include "gettime.h"
@@ -619,9 +620,49 @@ rpcs::dispatch(djob_t *j)
 rpcs::rpcstate_t 
 rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
-{
+{ 
 	ScopedLock rwl(&reply_window_m_);
-
+	/* lab #1 */
+	std::list<reply_t>::iterator it;
+	for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end();){
+		// delete the old forgotten replies
+		if(it->xid < xid_rep /*&& it->cb_present*/){
+			free(it->buf);
+			it = reply_window_[clt_nonce].erase(it);
+			continue;
+		}
+		if(it->xid == xid){
+			if(it->cb_present){
+				*b = it->buf;
+				*sz = it->sz;
+				return DONE;
+			}
+			return INPROGRESS;
+		}
+		/*
+		if(reply_window_[clt_nonce].front().xid > xid){
+		// why in this loop? because we must trim the window first then check front().xid 
+			return FORGOTTEN;
+		}*/
+		it++;
+	}
+	if(reply_window_[clt_nonce].size() != 0){
+		if(reply_window_[clt_nonce].front().xid > xid){
+			return FORGOTTEN;
+		}
+	}
+	// update the window if it is a new request
+	reply_t new_rep(xid);
+	for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end(); it++){
+		if(it->xid > xid){
+			reply_window_[clt_nonce].insert(it, new_rep);
+			break;
+		}
+	}
+	if(it == reply_window_[clt_nonce].end()){
+		reply_window_[clt_nonce].push_back(new_rep);
+	}
+	/* lab #1 */
         // You fill this in for Lab 1.
 	return NEW;
 }
@@ -636,6 +677,17 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 		char *b, int sz)
 {
 	ScopedLock rwl(&reply_window_m_);
+	/* lab #1 */
+	std::list<reply_t>::iterator it;
+	for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end(); it++){
+		if(it->xid == xid){
+			it->buf = b;
+			it->sz = sz;
+			it->cb_present = true;
+			break;
+		}
+	}
+	/* lab #1 */
         // You fill this in for Lab 1.
 }
 

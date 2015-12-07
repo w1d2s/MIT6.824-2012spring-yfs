@@ -1,4 +1,4 @@
-LAB=1
+LAB=2
 SOL=0
 RPC=./rpc
 LAB2GE=$(shell expr $(LAB) \>\= 2)
@@ -15,7 +15,7 @@ else
 MACFLAGS=
 endif
 LDFLAGS = -L. -L/usr/local/lib
-LDLIBS = -lpthread 
+LDLIBS = -lpthread
 ifeq ($(LAB2GE),1)
 ifeq ($(shell uname -s),Darwin)
 ifeq ($(shell sw_vers -productVersion | sed -e "s/.*\(10\.[0-9]\).*/\1/"),10.6)
@@ -34,7 +34,7 @@ CXX = g++
 
 lab:  lab$(LAB)
 lab1: rpc/rpctest lock_server lock_tester lock_demo
-lab2: yfs_client extent_server
+lab2: rpc/rpctest lock_server lock_tester lock_demo yfs_client extent_server
 lab3: yfs_client extent_server lock_server test-lab-3-b test-lab-3-c
 lab4: yfs_client extent_server lock_server lock_tester test-lab-3-b\
 	 test-lab-3-c
@@ -117,5 +117,5 @@ fuse.o: fuse.cc
 -include *.d
 
 .PHONY : clean
-clean : 
+clean :
 	rm -rf rpc/rpctest rpc/*.o rpc/*.d rpc/librpc.a *.o *.d yfs_client extent_server lock_server lock_tester lock_demo rpctest test-lab-3-b test-lab-3-c rsm_tester

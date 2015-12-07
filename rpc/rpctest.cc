@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <unistd.h>
 #include "jsl_log.h"
 #include "gettime.h"
 
