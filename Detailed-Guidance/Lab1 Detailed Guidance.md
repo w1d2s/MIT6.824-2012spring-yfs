@@ -15,48 +15,48 @@ yfs服务器需要锁服务来协调对文件系统的更新，在lab1当中我�
 ```
 每个RPC过程都有一个独一无二的过程号(procedure number)，client端acquire和release的过程号在lock_protocol.h中有定义，即lock_protocol::acquire和lock_protocol::release，在服务器端这两个调用的handler是lock_server的grant方法和release方法。  
 在实现lock_server的这两个方法前，先在lock_protocol.h中定义锁：
-```C++
+```c++
 class lock{
 private:
-	lock_protocol::lockid_t lid;
-	int clt;
-	enum st{
-		locked,
-		free
-	}state;
+    lock_protocol::lockid_t lid;
+    int clt;
+    enum st{
+	locked,
+	free
+    }state;
 public:
-	pthread_cond_t cond_lock;
-	lock(lock_protocol::lockid_t _lid){
-		lid = _lid; //锁的id
-		clt = 0;    //当前持有锁的client
-		state = free;  //锁的状态
-		cond_lock = PTHREAD_COND_INITIALIZER; //在锁locked时，用于阻塞其他请求该锁的进程。在锁free后唤醒它们
+    pthread_cond_t cond_lock;
+    lock(lock_protocol::lockid_t _lid){
+	lid = _lid; //锁的id
+	clt = 0;    //当前持有锁的client
+	state = free;  //锁的状态
+	cond_lock = PTHREAD_COND_INITIALIZER; //在锁locked时，用于阻塞其他请求该锁的进程。在锁free后唤醒它们
+    }
+    ~lock(){}
+    bool Is_Locked(){
+	if(state == locked){
+	    return true;
 	}
-	~lock(){}
-	bool Is_Locked(){
-		if(state == locked){
-			return true;
-		}
-		return false;
+	return false;
+    }
+    int Get_Owner(){
+	return clt;
+    }
+    bool Set_Locked(int _clt){
+	if(state == free){
+	    state = locked;
+	    clt = _clt;
+	    return true;
 	}
-	int Get_Owner(){
-		return clt;
+	else{
+	    printf("err: this lock is locked by %d \n", clt);
+	    return false;
 	}
-	bool Set_Locked(int _clt){
-		if(state == free){
-			state = locked;
-			clt = _clt;
-			return true;
-		}
-		else{
-			printf("err: this lock is locked by %d \n", clt);
-			return false;
-		}
-	}
-	void Set_Free(){
-		state = free;
-		clt = 0;
-	}
+    }
+    void Set_Free(){
+	state = free;
+	clt = 0;
+    }
 };
 ```
 下面是lock_server在lock_server.h中的定义，添加一个互斥量mutex和一个map。map维护了所有锁的状态，mutex用于保护这个map的读写。其实应该每个锁由一个单独的mutex保护，然而课程的Detailed guidance里说只用一个粗粒度的mutex就行，可以简化代码。
@@ -95,7 +95,7 @@ lock_server::grant(int clt, lock_protocol::lockid_t lid, int &r){
 		lock * temp = new lock(lid);
 		mapLocks.insert(std::make_pair(lid, temp));
 		temp->Set_Locked(clt);
-	}	
+	}
 	pthread_mutex_unlock(&mutex);
 	/* after granting the lock to clt */
 	lock_protocol::status ret = lock_protocol::OK;
@@ -147,3 +147,59 @@ lock_client::release(lock_protocol::lockid_t lid){
 ```
 到此为止lab1的第一部分完成，可以通过lock_tester.cc的测试。
 
+### 第二部分
+ RPC库会重复发送某些请求，从而弥补网络状况不佳导致的丢包。这一部分要消除RPC重复请求。每个RPC请求可以由xid和clt_nonce两个表示唯一确定。当每个客户端的RPC请求xid严格单调生成的时候，我们可以在服务器端用一个滑动窗口    
+```c++
+std::map<unsigned int, std::list<reply_t> > reply_window_;
+```
+  记录部分RPC请求。当服务器端的每个请求(xid, clt_nonce, xid_rep)，其中xid_rep是客户端告诉服务器在这个标号之前的请求都已经收到了回复，所以在服务器端滑动窗口可以把xid_rep之前的请求都删掉。同时如果这是一个新请求，将其按照xid大小顺序插入到滑动窗口中的相应位置；如果这个请求已经存在，则要看对应的reply_t结构体中的内容：cb_present为true，说明已经处理过了，直接从*b和*sz读取结果回复客户端；cb_present为false，说明这个请求正在处理当中。这个过程由rpc/rpc.cc中的checkduplicate_and_update()函数完成。
+  ```c++
+  rpcs::rpcstate_t
+  rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
+  		unsigned int xid_rep, char **b, int *sz){
+  	ScopedLock rwl(&reply_window_m_);
+  	/* lab #1 */
+  	std::list<reply_t>::iterator it;
+  	for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end();){
+  		// delete the old forgotten replies
+  		if(it->xid < xid_rep /*&& it->cb_present*/){
+  			free(it->buf);
+  			it = reply_window_[clt_nonce].erase(it);
+  			continue;
+  		}
+  		if(it->xid == xid){
+  			if(it->cb_present){
+  				*b = it->buf;
+  				*sz = it->sz;
+  				return DONE;
+  			}
+  			return INPROGRESS;
+  		}
+  		it++;
+  	}
+  	if(reply_window_[clt_nonce].size() != 0){
+  		if(reply_window_[clt_nonce].front().xid > xid){
+  			return FORGOTTEN;
+  		}
+  	}
+  ```  
+  add_reply()函数用于将已经处理完的请求的回复填充到滑动窗口中对应请求的reply_t结构体中。  
+  ```c++
+  void
+  rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
+  		char *b, int sz){
+      ScopedLock rwl(&reply_window_m_);
+      /* lab #1 */
+      std::list<reply_t>::iterator it;
+      for(it = reply_window_[clt_nonce].begin(); it != reply_window_[clt_nonce].end(); it++){
+  	  if(it->xid == xid){
+  	      it->buf = b;
+  	      it->sz = sz;
+  	      it->cb_present = true;
+  	      break;
+  	  }
+      }
+      // You fill this in for Lab 1.
+  }
+  ```
+  至此lab1完成，将RPC_LOSSY设为5依然能够通过rpc/rpctest和lock_tester的测试。
