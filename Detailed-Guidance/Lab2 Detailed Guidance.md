@@ -1,4 +1,4 @@
-# Lab2 Basic File Server  
+# Lab2 Detailed Guidance - Basic File Server  
 ## 简介
 Lab2要实现基本的文件系统，即实现下列基本操作：    
 * CREATE/MKNOD, LOOKUP, READDIR  
