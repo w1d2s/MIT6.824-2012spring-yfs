@@ -1,4 +1,4 @@
-# Lab 1 Detailed Guidance - Lock Server
+# Lab1 Detailed Guidance - Lock Server
 ## 简介
 yfs服务器需要锁服务来协调对文件系统的更新，在lab1当中我们要实现这个锁服务。
 锁服务的核心逻辑由两个模块组成：lock_client和lock_server，两个模块通过RPC(Remote Procedure Call Protocol，远程过程调用协议)来通信。一个client在请求某个锁时，会给lock_server发送一个acquire的请求，收到请求后lock_server会在某时刻把锁交给client。在client使用完锁之后，会发送release请求给lock_server来请求释放这个锁，以便其他的client可以请求这个锁。  
