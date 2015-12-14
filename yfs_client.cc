@@ -126,12 +126,12 @@ yfs_client::create(inum parent, const char * name, inum & ino){
             // return yfs_client::EXIST if file 'name' already exist
             return yfs_client::EXIST;
         }
-    }
-    if(ec->put(ino, fileRaw) == extent_protocol::OK){
-        // directory format: {[filename][inum]}
-        dirRaw.append(fileName + filename(ino) + "]}");
-        ec->put(parent, dirRaw);
-        return yfs_client::OK;
+        if(ec->put(ino, fileRaw) == extent_protocol::OK){
+            // directory format: {[filename][inum]}
+            dirRaw.append(fileName + filename(ino) + "]}");
+            ec->put(parent, dirRaw);
+            return yfs_client::OK;
+        }
     }
     return yfs_client::IOERR;
 }
