@@ -320,6 +320,7 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name){
         fuse_reply_err(req, 0);
         return;
     }
+    
     // You fill this in for Lab 3
     // Success:	fuse_reply_err(req, 0);
     // Not found:	fuse_reply_err(req, ENOENT);

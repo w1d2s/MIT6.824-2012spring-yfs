@@ -125,7 +125,6 @@ yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
     do{  //eliminate collision
         ino = random_inum(isFile);
     }while(ec->get(ino, tmpBuf) != extent_protocol::NOENT);
-    /* lab #3 */
     ScopedLockClient slc(lc, parent);
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         //directory 'parent' already exists
@@ -145,7 +144,6 @@ yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
 
 yfs_client::status
 yfs_client::lookup(inum parent, const char * name, inum & ino){
-    /* lab #3 */
     ScopedLockClient slc(lc, parent);
     std::string dirRaw = "";
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
@@ -158,7 +156,6 @@ yfs_client::lookup(inum parent, const char * name, inum & ino){
 
 yfs_client::status
 yfs_client::readdir(inum ino, std::vector<yfs_client::dirent> & files){
-    /* lab #3 */
     ScopedLockClient slc(lc, ino);
     std::string dirRaw = "";
     yfs_client::dirent tempDir;
@@ -183,7 +180,6 @@ yfs_client::readdir(inum ino, std::vector<yfs_client::dirent> & files){
 
 yfs_client::status
 yfs_client::setattr(inum ino, struct stat * attr){
-    /* lab #3 */
     ScopedLockClient slc(lc, ino);
     std::string data;
     size_t size = attr->st_size;
@@ -234,7 +230,6 @@ yfs_client::write(inum ino, size_t & size, off_t offset, const char * buf){
 /* lab #3 */
 yfs_client::status
 yfs_client::unlink(inum parent, const char * name){
-    /* lab #3 */
     ScopedLockClient slc(lc, parent);
     inum ino;
     std::string dirRaw = "";
