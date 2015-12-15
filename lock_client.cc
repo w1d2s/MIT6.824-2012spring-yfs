@@ -41,4 +41,3 @@ lock_client::release(lock_protocol::lockid_t lid){
 	assert(ret == lock_protocol::OK);
 	return r;
 }
-

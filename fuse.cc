@@ -89,6 +89,7 @@ fuseserver_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr, int to_set
         if(yfs->setattr(inum, attr) == yfs_client::OK){
             if(getattr(inum, st) == yfs_client::OK){
                 fuse_reply_attr(req, &st, 0);
+                return;
             }
             fuse_reply_err(req, ENOSYS);
         }
@@ -106,7 +107,8 @@ fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
     std::string buf = "";
     yfs_client::inum inum = ino;
     if(yfs->read(inum, size, off, buf) == yfs_client::OK){
-        fuse_reply_buf(req, buf.c_str(), size);
+        fuse_reply_buf(req, buf.data(), buf.size());
+        return;
     }
     // You fill this in for Lab 2
     fuse_reply_err(req, ENOSYS);
@@ -120,6 +122,7 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
     yfs_client::inum inum = ino;
     if(yfs->write(inum, size, off, buf) == yfs_client::OK){
         fuse_reply_write(req, size);
+        return;
     }
     // You fill this in for Lab 2
     fuse_reply_err(req, ENOSYS);
@@ -136,7 +139,7 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
     yfs_client::status ret;
     // get struct stat attr and ino(inum) for e
     yfs_client::inum ino, pa = parent;
-    ret = yfs->create(pa, name, ino);
+    ret = yfs->create(pa, name, ino, true);
     if(ret != yfs_client::OK){
         return ret;
     }
@@ -290,30 +293,37 @@ fuseserver_open(fuse_req_t req, fuse_ino_t ino,
 
 void
 fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
-     mode_t mode)
-{
-  struct fuse_entry_param e;
-  // In yfs, timeouts are always set to 0.0, and generations are always set to 0
-  e.attr_timeout = 0.0;
-  e.entry_timeout = 0.0;
-  e.generation = 0;
-
-  // You fill this in for Lab 3
-#if 0
-  fuse_reply_entry(req, &e);
-#else
-  fuse_reply_err(req, ENOSYS);
-#endif
+     mode_t mode){
+    struct fuse_entry_param e;
+    // In yfs, timeouts are always set to 0.0, and generations are always set to 0
+    e.attr_timeout = 0.0;
+    e.entry_timeout = 0.0;
+    e.generation = 0;
+    /* lab #3 */
+    yfs_client::inum pa = parent, ino;
+    if(yfs->create(pa, name, ino, false) == yfs_client::OK){
+        e.ino = ino;
+        if(getattr(ino, e.attr) == yfs_client::OK){
+            fuse_reply_entry(req, &e);
+            return;
+        }
+    }
+    fuse_reply_err(req, ENOSYS);
+    // You fill this in for Lab 3
 }
 
 void
-fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
-{
-
-  // You fill this in for Lab 3
-  // Success:	fuse_reply_err(req, 0);
-  // Not found:	fuse_reply_err(req, ENOENT);
-  fuse_reply_err(req, ENOSYS);
+fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name){
+    /* lab #3 */
+    yfs_client::inum pa = parent;
+    if(yfs->unlink(pa, name) == yfs_client::OK){
+        fuse_reply_err(req, 0);
+        return;
+    }
+    // You fill this in for Lab 3
+    // Success:	fuse_reply_err(req, 0);
+    // Not found:	fuse_reply_err(req, ENOENT);
+    fuse_reply_err(req, ENOSYS);
 }
 
 void

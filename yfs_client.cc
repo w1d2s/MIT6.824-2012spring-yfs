@@ -13,6 +13,7 @@
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst){
     ec = new extent_client(extent_dst);
+    lc = new lock_client(lock_dst);
 }
 
 yfs_client::inum
@@ -45,6 +46,8 @@ yfs_client::isdir(inum inum){
 int
 yfs_client::getfile(inum inum, fileinfo &fin){
     int r = OK;
+    /* lab #3 */
+    ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the file lock
 
@@ -69,6 +72,8 @@ yfs_client::getfile(inum inum, fileinfo &fin){
 int
 yfs_client::getdir(inum inum, dirinfo &din){
     int r = OK;
+    /* lab #3 */
+    ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the directory lock
 
@@ -114,12 +119,14 @@ yfs_client::dirparser(std::string raw, const char* name, inum & ino){
 
 
 yfs_client::status
-yfs_client::create(inum parent, const char * name, inum & ino){
+yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
     std::string dirRaw = "", fileRaw = "", tmpBuf;
     std::string fileName = "{[" + std::string(name) + "][";
     do{  //eliminate collision
-        ino = random_inum(true);
+        ino = random_inum(isFile);
     }while(ec->get(ino, tmpBuf) != extent_protocol::NOENT);
+    /* lab #3 */
+    ScopedLockClient slc(lc, parent);
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         //directory 'parent' already exists
         if(dirRaw.find(name) != std::string::npos){
@@ -138,18 +145,21 @@ yfs_client::create(inum parent, const char * name, inum & ino){
 
 yfs_client::status
 yfs_client::lookup(inum parent, const char * name, inum & ino){
+    /* lab #3 */
+    ScopedLockClient slc(lc, parent);
     std::string dirRaw = "";
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         if(dirparser(dirRaw, name, ino) == OK){
             return yfs_client::OK;
         }
-        return yfs_client::NOENT;
     }
     return yfs_client::NOENT;
 }
 
 yfs_client::status
 yfs_client::readdir(inum ino, std::vector<yfs_client::dirent> & files){
+    /* lab #3 */
+    ScopedLockClient slc(lc, ino);
     std::string dirRaw = "";
     yfs_client::dirent tempDir;
     if(ec->get(ino, dirRaw) == extent_protocol::OK){
@@ -173,6 +183,8 @@ yfs_client::readdir(inum ino, std::vector<yfs_client::dirent> & files){
 
 yfs_client::status
 yfs_client::setattr(inum ino, struct stat * attr){
+    /* lab #3 */
+    ScopedLockClient slc(lc, ino);
     std::string data;
     size_t size = attr->st_size;
     if(ec->get(ino, data) == extent_protocol::OK){
@@ -186,15 +198,13 @@ yfs_client::setattr(inum ino, struct stat * attr){
 }
 
 yfs_client::status
-yfs_client::read(inum ino, size_t & size, off_t offset, std::string & buf){
+yfs_client::read(inum ino, size_t size, off_t offset, std::string & buf){
     std::string data;
     if(ec->get(ino, data) == extent_protocol::OK){
         if((offset < 0) || (offset > data.size() - 1)){
-            buf = "";
-            size = 0;
+            buf = std::string();
         }else{
             buf = data.substr(offset, size);
-            size = buf.size();
         }
         return yfs_client::OK;
     }
@@ -203,6 +213,7 @@ yfs_client::read(inum ino, size_t & size, off_t offset, std::string & buf){
 
 yfs_client::status
 yfs_client::write(inum ino, size_t & size, off_t offset, const char * buf){
+    ScopedLockClient slc(lc, ino);
     std::string data;
     if(ec->get(ino, data) == extent_protocol::OK){
         if(offset < 0){  // note : append a str : offset = data.size()
@@ -219,5 +230,31 @@ yfs_client::write(inum ino, size_t & size, off_t offset, const char * buf){
     }
     return yfs_client::NOENT;
 }
-
 /* lab #2 */
+/* lab #3 */
+yfs_client::status
+yfs_client::unlink(inum parent, const char * name){
+    /* lab #3 */
+    ScopedLockClient slc(lc, parent);
+    inum ino;
+    std::string dirRaw = "";
+    if(ec->get(parent, dirRaw) == extent_protocol::OK){
+        if(dirparser(dirRaw, name, ino) == OK){
+            ScopedLockClient slc(lc, ino);
+            if(ec->remove(ino) == extent_protocol::OK){
+                std::string filename = "{[" + std::string(name) + "]";
+		        if(dirRaw.find(filename) == std::string::npos){
+                    return yfs_client::NOENT;
+		        }
+                int head = dirRaw.find(filename);
+                int tail = dirRaw.find("]}", head) + 2;
+                dirRaw.erase(head, tail - head);
+                if(ec->put(parent, dirRaw) == extent_protocol::OK){
+                    return yfs_client::OK;
+                }
+            }
+        }
+    }
+    return yfs_client::NOENT;
+}
+/* lab #3 */
