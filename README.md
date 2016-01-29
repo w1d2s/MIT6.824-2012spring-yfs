@@ -4,7 +4,7 @@ yfs是MIT6.824分布式系统的课程项目，根据论文[Frangipani: A Scalab
 
 **Lab 1 - Lock Server**  [(Detailed Guidance)](https://github.com/w1d2s/MIT6.824-2012spring-yfs/blob/lab1/Detailed-Guidance/Lab1%20Detailed%20Guidance.md)  
 **Lab 2 - Basic File Server**  [(Detailed Guidance)](https://github.com/w1d2s/MIT6.824-2012spring-yfs/blob/lab2/Detailed-Guidance/Lab2%20Detailed%20Guidance.md)  
-**Lab 3 - MKDIR, UNLINK, and Locking**  
+**Lab 3 - MKDIR, UNLINK, and Locking**  [(Detailed Guidance)](https://github.com/w1d2s/MIT6.824-2012spring-yfs/blob/lab3/Detailed-Guidance/Lab3%20Detailed%20Guidance.md)  
 **Lab 4 - Caching Lock Server**  
 **Lab 5 - Caching Extent Server + Consistency**  
 **Lab 6 - Paxos**  
