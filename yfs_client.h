@@ -7,11 +7,12 @@
 #include <vector>
 
 #include "lock_protocol.h"
-#include "lock_client.h"
+//#include "lock_client.h"
+#include "lock_client_cache.h"
 
 class yfs_client {
     extent_client *ec;
-    lock_client *lc;
+    lock_client_cache *lc;
     public:
 
         typedef unsigned long long inum;
@@ -64,10 +65,11 @@ class yfs_client {
 
 class ScopedLockClient{
 private:
-    lock_client *lc;
+    //lock_client *lc;
+    lock_client_cache *lc;
     yfs_client::inum ino;
 public:
-    ScopedLockClient(lock_client *_lc, yfs_client::inum _ino){
+    ScopedLockClient(lock_client_cache *_lc, yfs_client::inum _ino){
         ino = _ino;
         lc = _lc;
         lc->acquire(ino);

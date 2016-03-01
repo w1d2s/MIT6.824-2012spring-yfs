@@ -1,7 +1,8 @@
 // yfs client.  implements FS operations using extent and lock server
 #include "yfs_client.h"
 #include "extent_client.h"
-#include "lock_client.h"
+//#include "lock_client.h"
+#include "lock_client_cache.h"
 #include <sstream>
 #include <iostream>
 #include <stdio.h>
@@ -13,7 +14,8 @@
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst){
     ec = new extent_client(extent_dst);
-    lc = new lock_client(lock_dst);
+    //lc = new lock_client(lock_dst);
+    lc = new lock_client_cache(lock_dst);
 }
 
 yfs_client::inum
@@ -47,7 +49,7 @@ int
 yfs_client::getfile(inum inum, fileinfo &fin){
     int r = OK;
     /* lab #3 */
-    ScopedLockClient slc(lc, inum);
+    //ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the file lock
 
@@ -73,7 +75,7 @@ int
 yfs_client::getdir(inum inum, dirinfo &din){
     int r = OK;
     /* lab #3 */
-    ScopedLockClient slc(lc, inum);
+    //ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the directory lock
 
@@ -144,7 +146,7 @@ yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
 
 yfs_client::status
 yfs_client::lookup(inum parent, const char * name, inum & ino){
-    ScopedLockClient slc(lc, parent);
+    //ScopedLockClient slc(lc, parent);    // this lock produces tons of RPC!!!!!
     std::string dirRaw = "";
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         if(dirparser(dirRaw, name, ino) == OK){
