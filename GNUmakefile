@@ -1,4 +1,4 @@
-LAB=3
+LAB=4
 SOL=0
 RPC=./rpc
 LAB2GE=$(shell expr $(LAB) \>\= 2)
@@ -15,7 +15,7 @@ else
 MACFLAGS=
 endif
 LDFLAGS = -L. -L/usr/local/lib
-LDLIBS = -lpthread
+LDLIBS = -lpthread 
 ifeq ($(LAB2GE),1)
 ifeq ($(shell uname -s),Darwin)
 ifeq ($(shell sw_vers -productVersion | sed -e "s/.*\(10\.[0-9]\).*/\1/"),10.6)
@@ -44,10 +44,11 @@ lab7: lock_tester lock_server rsm_tester
 
 hfiles1=rpc/fifo.h rpc/connection.h rpc/rpc.h rpc/marshall.h rpc/method_thread.h\
 	rpc/thr_pool.h rpc/pollmgr.h rpc/jsl_log.h rpc/slock.h rpc/rpctest.cc\
-	lock_protocol.h lock_server.h lock_client.h gettime.h gettime.cc
+	lock_protocol.h lock_server.h lock_client.h gettime.h gettime.cc lang/verify.h \
+        lang/algorithm.h
 hfiles2=yfs_client.h extent_client.h extent_protocol.h extent_server.h
-hfiles3=lock_client_cache.h lock_server_cache.h
-hfiles4=log.h rsm.h rsm_protocol.h config.h paxos.h paxos_protocol.h rsm_state_transfer.h handle.h rsmtest_client.h tprintf.h
+hfiles3=lock_client_cache.h lock_server_cache.h handle.h tprintf.h
+hfiles4=log.h rsm.h rsm_protocol.h config.h paxos.h paxos_protocol.h rsm_state_transfer.h rsmtest_client.h tprintf.h
 hfiles5=rsm_state_transfer.h rsm_client.h
 rsm_files = rsm.cc paxos.cc config.cc log.cc handle.cc
 
@@ -74,7 +75,7 @@ lock_tester : $(patsubst %.cc,%.o,$(lock_tester)) rpc/librpc.a
 
 lock_server=lock_server.cc lock_smain.cc
 ifeq ($(LAB4GE),1)
-lock_server+=lock_server_cache.cc
+lock_server+=lock_server_cache.cc handle.cc
 endif
 ifeq ($(LAB6GE),1)
 lock_server+= $(rsm_files)
@@ -117,5 +118,5 @@ fuse.o: fuse.cc
 -include *.d
 
 .PHONY : clean
-clean :
+clean : 
 	rm -rf rpc/rpctest rpc/*.o rpc/*.d rpc/librpc.a *.o *.d yfs_client extent_server lock_server lock_tester lock_demo rpctest test-lab-3-b test-lab-3-c rsm_tester
