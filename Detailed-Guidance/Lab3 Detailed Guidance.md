@@ -145,8 +145,9 @@ public:
 * WRITE
 * SETATTR
 * READDIR
-* LOOKUP
 * CREATE
+
+注意不要给LOOKUP加锁，否则Lab4测试性能时，RPC数会暴涨。
 
 第二部分完成后应当能通过test-lab-3-b.c和test-lab-3-c.c。注意测试test-lab-3-b时也要用两个同样的参数测试一下，例如
 ```
