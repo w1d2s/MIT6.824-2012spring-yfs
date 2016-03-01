@@ -8,7 +8,7 @@ Lab3前半部分承接Lab2，实现以下操作：
 
 本次Lab完成后整个系统架构图应当如下图所示：
 
-![](https://github.com/w1d2s/MIT6.824-2012spring-yfs/blob/lab2/Detailed-Guidance/basic%20file%20system.jpg)  
+![](https://github.com/w1d2s/MIT6.824-2012spring-yfs/blob/lab4/Detailed-Guidance/basic%20file%20system.jpg)  
 
 ## 实现
 ### 第一部分：MKDIR & UNLINK
