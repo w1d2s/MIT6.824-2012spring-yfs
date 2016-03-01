@@ -5,6 +5,8 @@
 #include <netinet/in.h>
 #include <list>
 #include <map>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "thr_pool.h"
 #include "marshall.h"
@@ -69,7 +71,16 @@ class rpcc : public chanmgr {
 
 		std::map<int, caller *> calls_;
 		std::list<unsigned int> xid_rep_window_;
-
+                
+                struct request {
+                    request() { clear(); }
+                    void clear() { buf.clear(); xid = -1; }
+                    bool isvalid() { return xid != -1; }
+                    std::string buf;
+                    int xid;
+                };
+                struct request dup_req_;
+                int xid_rep_done_;
 	public:
 
 		rpcc(sockaddr_in d, bool retrans=true);
@@ -89,6 +100,8 @@ class rpcc : public chanmgr {
 		void set_reachable(bool r) { reachable_ = r; }
 
 		void cancel();
+                
+                int islossy() { return lossytest_ > 0; }
 
 		int call1(unsigned int proc, 
 				marshall &req, unmarshall &rep, TO to);
@@ -135,8 +148,13 @@ rpcc::call_m(unsigned int proc, marshall &req, R & r, TO to)
 	int intret = call1(proc, req, u, to);
 	if (intret < 0) return intret;
 	u >> r;
-	if(u.okdone() != true)
+	if(u.okdone() != true) {
+                fprintf(stderr, "rpcc::call_m: failed to unmarshall the reply."
+                       "You are probably calling RPC 0x%x with wrong return "
+                       "type.\n", proc);
+                VERIFY(0);
 		return rpc_const::unmarshal_reply_failure;
+        }
 	return intret;
 }
 
@@ -257,6 +275,10 @@ class rpcs : public chanmgr {
 
 	private:
 
+        // state about an in-progress or completed RPC, for at-most-once.
+        // if cb_present is true, then the RPC is complete and a reply
+        // has been sent; in that case buf points to a copy of the reply,
+        // and sz holds the size of the reply.
 	struct reply_t {
 		reply_t (unsigned int _xid) {
 			xid = _xid;
@@ -265,9 +287,9 @@ class rpcs : public chanmgr {
 			sz = 0;
 		}
 		unsigned int xid;
-		bool cb_present;
-		char *buf;
-		int sz;
+		bool cb_present; // whether the reply buffer is valid
+		char *buf;      // the reply buffer
+		int sz;         // the size of reply buffer
 	};
 
 	int port_;
@@ -275,6 +297,7 @@ class rpcs : public chanmgr {
 
 	// provide at most once semantics by maintaining a window of replies
 	// per client that that client hasn't acknowledged receiving yet.
+        // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
 
 	void free_reply_window(void);
@@ -325,7 +348,7 @@ class rpcs : public chanmgr {
 	public:
 	rpcs(unsigned int port, int counts=0);
 	~rpcs();
-
+        inline int port() { return listener_->port(); }
 	//RPC handler for clients binding
 	int rpcbind(int a, int &r);
 
