@@ -12,6 +12,7 @@
 
 class yfs_client {
     extent_client *ec;
+    lock_user *lu;
     lock_client_cache *lc;
     public:
 

@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include <iostream>
+
 extent_server::extent_server(){
     pthread_mutex_init(&mutex, NULL);
     int ret;
@@ -28,6 +30,8 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &){
     mapAttr[id].size = buf.size();
     mapAttr[id].mtime = curtime;
     mapAttr[id].ctime = curtime;
+    //std::cout << "put id : " << id << std::endl;
+    //std::cout << "  data : " << buf << std::endl;
     //pthread_mutex_unlock(&mutex);
     return extent_protocol::OK;
 /* lab #2 */
@@ -40,6 +44,8 @@ int extent_server::get(extent_protocol::extentid_t id, std::string &buf){
     if(mapContent.find(id) != mapContent.end()){
         buf = mapContent[id];
         mapAttr[id].atime = time(NULL);
+        //std::cout << "get id : " << id << std::endl;
+        //std::cout << "  data : " << buf << std::endl;
         //pthread_mutex_unlock(&mutex);
         return extent_protocol::OK;
     }
@@ -60,6 +66,7 @@ int extent_server::getattr(extent_protocol::extentid_t id, extent_protocol::attr
         a.atime = mapAttr[id].atime;
         a.mtime = mapAttr[id].mtime;
         a.ctime = mapAttr[id].ctime;
+        //std::cout << "getattr id : " << id << std::endl;
         //pthread_mutex_unlock(&mutex);
         return extent_protocol::OK;
     }
@@ -75,6 +82,7 @@ int extent_server::remove(extent_protocol::extentid_t id, int &){
     if(mapContent.find(id) != mapContent.end()){
         mapContent.erase(id);
         mapAttr.erase(id);
+        //std::cout << "remove id : " << id << std::endl;
         //pthread_mutex_unlock(&mutex);
         return extent_protocol::OK;
     }

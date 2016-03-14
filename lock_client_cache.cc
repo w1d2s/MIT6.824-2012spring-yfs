@@ -13,7 +13,7 @@
 int lock_client_cache::last_port = 0;
 
 lock_client_cache::lock_client_cache(std::string xdst,
-				     class lock_release_user *_lu)
+				     class lock_user *_lu)
   : lock_client(xdst), lu(_lu)
 {
   srand(time(NULL)^last_port);
@@ -29,6 +29,14 @@ lock_client_cache::lock_client_cache(std::string xdst,
   rlsrpc->reg(rlock_protocol::revoke, this, &lock_client_cache::revoke_handler);
   rlsrpc->reg(rlock_protocol::retry, this, &lock_client_cache::retry_handler);
   mutex = PTHREAD_MUTEX_INITIALIZER;
+}
+
+/* lab #5 */
+void lock_user::dorelease(lock_protocol::lockid_t lid){
+	if(ec->flush(lid) == extent_protocol::OK){
+		return;
+	}
+	//printf("	--- flush failed! \n");
 }
 
 lock_protocol::status
@@ -106,10 +114,10 @@ lock_client_cache::release(lock_protocol::lockid_t lid){
 		return lock_protocol::NOENT;
 	}
 	if(lockCache[lid].getRevoke){
-		//printf("releasing lock %d via RPC!\n", &lid);
 		lockCache[lid].state = Releasing;
 		lockCache[lid].getRevoke = false;
-		//pthread_cond_broadcast(&(lockCache[lid].waitQueue));
+		/* lab #5 */
+		lu->dorelease(lid);
 		pthread_mutex_unlock(&mutex);
 		ret = cl->call(lock_protocol::release, lid, id, r);
 		pthread_mutex_lock(&mutex);
@@ -118,7 +126,6 @@ lock_client_cache::release(lock_protocol::lockid_t lid){
 		pthread_mutex_unlock(&mutex);
 		return ret;
 	}else{
-		//printf("	releasing lock %d to Cache!\n", &lid);
 		lockCache[lid].state = Free;
 		pthread_cond_signal(&(lockCache[lid].waitQueue));
 		pthread_mutex_unlock(&mutex);
@@ -137,6 +144,8 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid, int &){
 	}else{
 		if(lockCache[lid].state == Free){
 			lockCache[lid].state = Releasing;
+			/* lab #5 */
+			lu->dorelease(lid);
 			pthread_mutex_unlock(&mutex);
 			int ret_ = cl->call(lock_protocol::release, lid, id, r);
 			pthread_mutex_lock(&mutex);

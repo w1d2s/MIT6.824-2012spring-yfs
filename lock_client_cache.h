@@ -10,7 +10,7 @@
 #include "lock_client.h"
 #include "lang/verify.h"
 #include <pthread.h>
-
+#include "extent_client.h"
 
 // Classes that inherit lock_release_user can override dorelease so that
 // that they will be called when lock_client releases a lock.
@@ -21,9 +21,19 @@ class lock_release_user {
   virtual ~lock_release_user() {};
 };
 
+/* lab #5 */
+class lock_user : lock_release_user {
+private:
+    extent_client *ec;
+public:
+    lock_user(class extent_client * _ec) : ec(_ec) {}
+    void dorelease(lock_protocol::lockid_t);
+};
+
 class lock_client_cache : public lock_client {
 private:
-    class lock_release_user *lu;
+    //class lock_release_user *lu;
+    class lock_user *lu;
     int rlock_port;
     std::string hostname;
     std::string id;
@@ -50,7 +60,7 @@ public:
     std::map<lock_protocol::lockid_t, lock_info> lockCache;
     /* lab #4 */
     static int last_port;
-    lock_client_cache(std::string xdst, class lock_release_user *l = 0);
+    lock_client_cache(std::string xdst, class lock_user *l = 0);
     virtual ~lock_client_cache() {};
     lock_protocol::status acquire(lock_protocol::lockid_t);
     lock_protocol::status release(lock_protocol::lockid_t);

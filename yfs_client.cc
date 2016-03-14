@@ -13,9 +13,10 @@
 
 
 yfs_client::yfs_client(std::string extent_dst, std::string lock_dst){
-    ec = new extent_client(extent_dst);
+    ec = new extent_client(extent_dst);;
+    lu = new lock_user(ec);
     //lc = new lock_client(lock_dst);
-    lc = new lock_client_cache(lock_dst);
+    lc = new lock_client_cache(lock_dst, lu);
 }
 
 yfs_client::inum
@@ -52,7 +53,7 @@ yfs_client::getfile(inum inum, fileinfo &fin){
     //ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the file lock
-
+    ScopedLockClient slc(lc, inum);
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
@@ -78,7 +79,7 @@ yfs_client::getdir(inum inum, dirinfo &din){
     //ScopedLockClient slc(lc, inum);
     // You modify this function for Lab 3
     // - hold and release the directory lock
-
+    ScopedLockClient slc(lc, inum);
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
     if (ec->getattr(inum, a) != extent_protocol::OK) {
@@ -124,9 +125,10 @@ yfs_client::status
 yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
     std::string dirRaw = "", fileRaw = "", tmpBuf;
     std::string fileName = "{[" + std::string(name) + "][";
-    do{  //eliminate collision
-        ino = random_inum(isFile);
-    }while(ec->get(ino, tmpBuf) != extent_protocol::NOENT);
+    /*do{  //eliminate collision
+
+    }while(ec->get(ino, tmpBuf) != extent_protocol::NOENT);*/
+    ino = random_inum(isFile);
     ScopedLockClient slc(lc, parent);
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         //directory 'parent' already exists
@@ -134,9 +136,12 @@ yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
             // return yfs_client::EXIST if file 'name' already exist
             return yfs_client::EXIST;
         }
+        ScopedLockClient slc2(lc, ino);  // ino is an empty file!!
         if(ec->put(ino, fileRaw) == extent_protocol::OK){
             // directory format: {[filename][inum]}
             dirRaw.append(fileName + filename(ino) + "]}");
+            //std::cout << "yfs client create/mkdir at root : " << parent << std::endl;
+            //std::cout << "      dirRaw : " << dirRaw << std::endl;
             ec->put(parent, dirRaw);
             return yfs_client::OK;
         }
@@ -146,12 +151,16 @@ yfs_client::create(inum parent, const char * name, inum & ino, bool isFile){
 
 yfs_client::status
 yfs_client::lookup(inum parent, const char * name, inum & ino){
-    //ScopedLockClient slc(lc, parent);    // this lock produces tons of RPC!!!!!
+    ScopedLockClient slc(lc, parent);    // this lock produces tons of RPC!!!!!
     std::string dirRaw = "";
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
+        //std::cout << "yfs client lookup id : " << parent << std::endl;
+        //std::cout << "      lookup data : " << dirRaw << std::endl;
+        //std::cout << "      looking for : " << name << std::endl;
         if(dirparser(dirRaw, name, ino) == OK){
             return yfs_client::OK;
         }
+        //std::cout << "      look for " << name << " failed!" << std::endl;
     }
     return yfs_client::NOENT;
 }
@@ -188,6 +197,8 @@ yfs_client::setattr(inum ino, struct stat * attr){
     if(ec->get(ino, data) == extent_protocol::OK){
         data.resize(size, '\0');
         if(ec->put(ino, data) != extent_protocol::OK){
+            //std::cout << "yfs client setattr id : " << ino << std::endl;
+            //std::cout << "      after : " << data << std::endl;
             return yfs_client::IOERR;
         }
         return yfs_client::OK;
@@ -198,6 +209,7 @@ yfs_client::setattr(inum ino, struct stat * attr){
 yfs_client::status
 yfs_client::read(inum ino, size_t size, off_t offset, std::string & buf){
     std::string data;
+    ScopedLockClient slc(lc, ino);
     if(ec->get(ino, data) == extent_protocol::OK){
         if((offset < 0) || (offset > data.size() - 1)){
             buf = std::string();
@@ -214,6 +226,8 @@ yfs_client::write(inum ino, size_t & size, off_t offset, const char * buf){
     ScopedLockClient slc(lc, ino);
     std::string data;
     if(ec->get(ino, data) == extent_protocol::OK){
+        //std::cout << "yfs client write to id : " << ino << std::endl;
+        //std::cout << "      origin : " <<  data << std::endl;
         if(offset < 0){  // note : append a str : offset = data.size()
         }else{
             if(offset + size > data.size()){
@@ -224,6 +238,7 @@ yfs_client::write(inum ino, size_t & size, off_t offset, const char * buf){
                 return yfs_client::IOERR;
             }
         }
+        //std::cout << "      new : " <<  data << std::endl;
         return yfs_client::OK;
     }
     return yfs_client::NOENT;
@@ -237,16 +252,20 @@ yfs_client::unlink(inum parent, const char * name){
     std::string dirRaw = "";
     if(ec->get(parent, dirRaw) == extent_protocol::OK){
         if(dirparser(dirRaw, name, ino) == OK){
-            ScopedLockClient slc(lc, ino);
+            ScopedLockClient slc2(lc, ino);
             if(ec->remove(ino) == extent_protocol::OK){
+                //std::cout << "yfs client : remove id : " << ino << std::endl;
                 std::string filename = "{[" + std::string(name) + "]";
 		        if(dirRaw.find(filename) == std::string::npos){
+                    //std::cout << "yfs client : remove " << filename << " not found !" << std::endl;
                     return yfs_client::NOENT;
 		        }
                 int head = dirRaw.find(filename);
                 int tail = dirRaw.find("]}", head) + 2;
                 dirRaw.erase(head, tail - head);
                 if(ec->put(parent, dirRaw) == extent_protocol::OK){
+                    //std::cout << "yfs client : remove at root " << parent << std::endl;
+                    //std::cout << "       dirRaw " << dirRaw << std::endl;
                     return yfs_client::OK;
                 }
             }
